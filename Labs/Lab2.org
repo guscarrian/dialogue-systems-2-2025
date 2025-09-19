@@ -35,8 +35,8 @@ In this part you will create a voice-enabled chatbot.
   @startuml
   state Loop {
     [*] --> Speaking
-    ChatCompletion: invoke(generateGreeting)
-    ChatCompletion --> Speaking: onDone\n \\append(event.output,messages)
+    ChatCompletion: invoke(chatCompletion)
+    ChatCompletion --> Speaking: onDone\n/append(event.output,messages)
     Speaking: **entry:** speak(lastMessage)
     Speaking --> Ask: SPEAK_COMPLETE
     Ask: **entry:** listen
