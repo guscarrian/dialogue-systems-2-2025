@@ -3,9 +3,10 @@
 ** Getting started: 
 
 1. Register at https://furhat.io/ (“Get SDK”) and install the SDK and virtual Furhat.
-2. Launch virtual Furhat and Start Remote API.
-3. Clone the repository: https://github.com/vladmaraev/xstate-furhat-starter.
-4. If you wish you can use other ways to control Furhat, namely Kotlin Skill API or Blockly.
+2. Find your API key at https://furhat.io/profile/user - scroll down after you sign in.
+3. Launch virtual Furhat and Start Remote API.
+4. Clone the repository: https://github.com/vladmaraev/xstate-furhat-starter.
+5. If you wish you can use other ways to control Furhat, namely Kotlin Skill API or Blockly.
 
    
 ** Part A:
