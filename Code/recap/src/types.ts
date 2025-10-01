@@ -8,6 +8,7 @@ export interface DMContext {
   informationState: { latestMove: string };
   ollamaModels?: string[];
   greeting?: string;
+  messages: Message[];
 }
 
 export type DMEvents =
@@ -16,4 +17,8 @@ export type DMEvents =
   | { type: "SAYS"; value: string }
   | { type: "NEXT_MOVE"; value: string }
   | { type: "DONE" };
-        
+
+export type Message = {
+  role: "assistant" | "user" | "system";
+  content: string;
+}

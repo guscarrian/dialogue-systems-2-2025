@@ -2,7 +2,7 @@ import { assign, createActor, fromPromise, raise, setup } from "xstate";
 import { speechstate } from "speechstate";
 import type { Settings } from "speechstate";
 
-import type { DMEvents, DMContext } from "./types";
+import type { DMEvents, DMContext, Message } from "./types";
 
 import { KEY } from "./azure";
 
@@ -39,7 +39,37 @@ const dmMachine = setup({
     // Also I'm adding a fallback for the sake of saving time in the future!
     sst_speak: ({context}, params: { value?: string }) => 
       context.spstRef.send({ type: "SPEAK", value: {utterance: params.value ?? "Fallback in action" } }), //fallback
+    
+    //When user input is recognised --> append messages
+    appendUserMessage: assign(({ context, event }) => {
+      if (event.type === "RECOGNISED") {
+        return {
+          messages: [...context.messages, 
+            {
+              role: "user",
+              content: event.value[0].utterance
+            }
+          ]
+        };
+      }
+      return {};
+    }),
+
+    // When LLM returns a response --> append messages
+    appendAssistantMessage: assign(({ context, event }) => {
+      return {
+        messages: [...context.messages, 
+          {
+            role: "assistant",
+            content: event.output.message.content
+          }
+        ]
+      };
+    }),
+
+
   },
+
   actors: {
     //tutorial
     getModels: fromPromise <any, null>(() =>
@@ -65,7 +95,24 @@ const dmMachine = setup({
       }).then((response) => response.json());
     },
     ),
+    //part 1
+    chatbotActor: fromPromise<any, Message[]>((messages) => {
+      const body = {
+        model: "llama3.1",
+        stream: false,
+        messages: messages, //history from the context - instead of sending just a string for input ("Please, provide a short greeting") as in GeneratingGreeting
+      };
+      return fetch("http://localhost:11434/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type" : "application/json",
+        },
+        body: JSON.stringify(body),
+      }).then((response) => response.json());
+    }),
+
   },
+  
 
 }).createMachine({
   id: "DM",
@@ -73,14 +120,21 @@ const dmMachine = setup({
     spstRef: spawn(speechstate, { input: settings }),
     informationState: { latestMove: "ping" },
     lastResult: "",
+    messages: [
+      {
+        role: "system",
+        content: "You are a conversation assistant and your job is to provide very brief chat-like responses.",
+      }
+    ],
   }),
   initial: "Prepare",
   states: {
     Prepare: {
       entry: "sst_prepare",
       on: {
-        //ASRTTS_READY: "GettingAvailableModels",
-        ASRTTS_READY: "GeneratingGreeting",
+        //ASRTTS_READY: "GettingAvailableModels", //tutorial
+        ASRTTS_READY: "GeneratingGreeting", //tutorial
+        //ASRTTS_READY: "UpdatedGreeting", //part 1
       },
     },
     //tutorial
@@ -132,7 +186,61 @@ const dmMachine = setup({
           value: context.greeting,
         }),
       },
+      on: {SPEAK_COMPLETE: "CompletionLoop"}
     },
+    //part 1
+    UpdatedGreeting: {
+      invoke: {
+        src: "chatbotActor",
+        input: ({ context }) => context.messages,
+        //input: "You are a conversation assistant and your job is to provide very brief chat-like responses.",
+        onDone: {
+          target: "ProvidingGreeting",
+          actions: assign(( {event} ) => {
+            console.log("Message: " + event.output.message.content)
+            return {
+              greeting: event.output.message.content };
+            }),
+          },
+        },
+      },
+
+    CompletionLoop: {
+      initial: "Speaking",
+      states: {
+        Speaking: {
+          entry: {
+            type: "sst_speak",
+            params: ({ context }) => ({
+              //this speaks the assistant's last message
+              value: context.messages[context.messages.length -1]?.content
+            }),
+          },
+          on: { SPEAK_COMPLETE: "Ask" }
+        },
+        Ask: {
+          entry: "sst_listen",
+          on: {
+            RECOGNISED: {
+              target: "ChatCompletion",
+              actions: "appendUserMessage"
+            },
+          },
+        },
+        ChatCompletion: {
+          invoke: {
+            src: "chatbotActor",
+            input: ({ context }) => context.messages,
+            onDone: {
+              target: "Speaking",
+              actions: "appendAssistantMessage"
+            },
+          }
+        },
+      },
+    },
+
+
     /*
     Main: {
       type: "parallel",
