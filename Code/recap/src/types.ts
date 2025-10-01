@@ -6,6 +6,8 @@ export interface DMContext {
   lastResult: string;
   // nextUtterance: string;
   informationState: { latestMove: string };
+  ollamaModels?: string[];
+  greeting?: string;
 }
 
 export type DMEvents =
@@ -14,3 +16,4 @@ export type DMEvents =
   | { type: "SAYS"; value: string }
   | { type: "NEXT_MOVE"; value: string }
   | { type: "DONE" };
+        

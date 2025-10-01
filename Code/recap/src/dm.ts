@@ -1,4 +1,4 @@
-import { assign, createActor, raise, setup } from "xstate";
+import { assign, createActor, fromPromise, raise, setup } from "xstate";
 import { speechstate } from "speechstate";
 import type { Settings } from "speechstate";
 
@@ -30,7 +30,43 @@ const dmMachine = setup({
   actions: {
     sst_prepare: ({ context }) => context.spstRef.send({ type: "PREPARE" }),
     sst_listen: ({ context }) => context.spstRef.send({ type: "LISTEN" }),
+    //sst_speak: ({context}, params: { value: string }) => 
+    //  context.spstRef.send({ type: "SPEAK", value: {utterance: params.value } }),
+    // Note to self: I made the action definition tolerate string | undefined
+    // (value: string is now value?: string) because of the mismatch:
+    // typescript sees context.greeting as string | undefined (not just string), and 
+    // in sst_speak it is defined as (params: { value: string })
+    // Also I'm adding a fallback for the sake of saving time in the future!
+    sst_speak: ({context}, params: { value?: string }) => 
+      context.spstRef.send({ type: "SPEAK", value: {utterance: params.value ?? "Fallback in action" } }), //fallback
   },
+  actors: {
+    //tutorial
+    getModels: fromPromise <any, null>(() =>
+      fetch("http://localhost:11434/api/tags").then((response) => 
+        response.json()
+      )  
+    ),
+    //tutorial
+    tutorialActor: fromPromise <any, string> ((input) => {
+      const body = {
+        model: "llama3.1",
+        stream: false,
+        messages: [
+          {
+            role: "user",
+            content: input.input,
+          },
+        ],
+      };
+      return fetch("http://localhost:11434/api/chat", {
+      method: "POST",
+      body: JSON.stringify(body),
+      }).then((response) => response.json());
+    },
+    ),
+  },
+
 }).createMachine({
   id: "DM",
   context: ({ spawn }) => ({
@@ -43,9 +79,61 @@ const dmMachine = setup({
     Prepare: {
       entry: "sst_prepare",
       on: {
-        ASRTTS_READY: "Main",
+        //ASRTTS_READY: "GettingAvailableModels",
+        ASRTTS_READY: "GeneratingGreeting",
       },
     },
+    //tutorial
+    GettingAvailableModels: {
+      invoke: {
+        src: "getModels",
+        input: null,
+        onDone: {
+          target: "ProvidingAvailableModels",
+          actions: assign(({ event }) => {
+            return {
+              ollamaModels: event.output.models.map((x: any) => x.name)
+            };
+          }),
+        },
+      },
+    },
+    //tutorial
+    ProvidingAvailableModels: {
+      entry: {
+        type: "sst_speak",
+        params: ({ context }) => ({
+          value: `Hi there! The available models are the following: ${context.ollamaModels!.join(" ")}`,
+          //value: `Hi there! The available models are the following`,
+        }),
+      },
+      on: { SPEAK_COMPLETE: "GeneratingGreeting" },
+    },
+    //tutorial
+    GeneratingGreeting: {
+      invoke: {
+        src: "tutorialActor",
+        input: "Please, provide a short greeting",
+        onDone: {
+          target: "ProvidingGreeting",
+          actions: assign(( {event} ) => {
+            console.log("Message: " + event.output.message.content)
+            return {
+              greeting: event.output.message.content };
+            }),
+          },
+        },
+      },
+    //tutorial
+    ProvidingGreeting: {
+      entry: {
+        type: "sst_speak",
+        params: ({ context }) => ({
+          value: context.greeting,
+        }),
+      },
+    },
+    /*
     Main: {
       type: "parallel",
       states: {
@@ -118,9 +206,10 @@ const dmMachine = setup({
           },
         },
       },
-    },
+    },*/
   },
 });
+
 
 const dmActor = createActor(dmMachine, {}).start();
 
