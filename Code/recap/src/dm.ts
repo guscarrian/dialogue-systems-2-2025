@@ -42,21 +42,20 @@ const dmMachine = setup({
     
     //When user input is recognised --> append messages
     appendUserMessage: assign(({ context, event }) => {
-      if (event.type === "RECOGNISED") {
-        return {
+      //console.log("appendUserMessage: " + event.value[0].utterance)
+      return {
           messages: [...context.messages, 
             {
               role: "user",
               content: event.value[0].utterance
             }
-          ]
+          ],
         };
-      }
-      return {};
     }),
 
     // When LLM returns a response --> append messages
     appendAssistantMessage: assign(({ context, event }) => {
+      //console.log("appendAssistantMessage: " + event.output.message.content)
       return {
         messages: [...context.messages, 
           {
@@ -66,7 +65,6 @@ const dmMachine = setup({
         ]
       };
     }),
-
 
   },
 
@@ -95,19 +93,17 @@ const dmMachine = setup({
       }).then((response) => response.json());
     },
     ),
+    
     //part 1
-    chatbotActor: fromPromise<any, Message[]>((messages) => {
+    chatbotActor: fromPromise<any, Message[]>((input) => {
       const body = {
         model: "llama3.1",
         stream: false,
-        messages: messages, //history from the context - instead of sending just a string for input ("Please, provide a short greeting") as in GeneratingGreeting
+        messages: input.input,
       };
       return fetch("http://localhost:11434/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type" : "application/json",
-        },
-        body: JSON.stringify(body),
+        body : JSON.stringify(body),
       }).then((response) => response.json());
     }),
 
@@ -122,8 +118,8 @@ const dmMachine = setup({
     lastResult: "",
     messages: [
       {
-        role: "system",
-        content: "You are a conversation assistant and your job is to provide very brief chat-like responses.",
+        role: "assistant",
+        content: "You are a conversation assistant and your job is to provide very brief chat-like responses. You can break the ice with a friendly greeting.",
       }
     ],
   }),
@@ -133,8 +129,8 @@ const dmMachine = setup({
       entry: "sst_prepare",
       on: {
         //ASRTTS_READY: "GettingAvailableModels", //tutorial
-        ASRTTS_READY: "GeneratingGreeting", //tutorial
-        //ASRTTS_READY: "UpdatedGreeting", //part 1
+        //ASRTTS_READY: "GeneratingGreeting", //tutorial
+        ASRTTS_READY: "UpdatedGreeting", //part 1
       },
     },
     //tutorial
@@ -184,6 +180,7 @@ const dmMachine = setup({
         type: "sst_speak",
         params: ({ context }) => ({
           value: context.greeting,
+
         }),
       },
       on: {SPEAK_COMPLETE: "CompletionLoop"}
@@ -193,37 +190,39 @@ const dmMachine = setup({
       invoke: {
         src: "chatbotActor",
         input: ({ context }) => context.messages,
-        //input: "You are a conversation assistant and your job is to provide very brief chat-like responses.",
         onDone: {
-          target: "ProvidingGreeting",
-          actions: assign(( {event} ) => {
-            console.log("Message: " + event.output.message.content)
-            return {
-              greeting: event.output.message.content };
-            }),
-          },
+          target: "CompletionLoop",
+          actions: assign({
+            messages: ({ event, context }) => [
+              ...context.messages, {
+                role: "assistant",
+                content: event.output.message.content
+              }
+            ],
+          }),
         },
       },
-
+    },
+    //part 1
     CompletionLoop: {
       initial: "Speaking",
       states: {
         Speaking: {
-          entry: {
-            type: "sst_speak",
-            params: ({ context }) => ({
-              //this speaks the assistant's last message
-              value: context.messages[context.messages.length -1]?.content
+          entry: ({ context }) =>
+            context.spstRef.send({
+              type: "SPEAK",
+              value: { utterance: context.messages[context.messages.length -1].content},
             }),
-          },
           on: { SPEAK_COMPLETE: "Ask" }
         },
         Ask: {
           entry: "sst_listen",
           on: {
-            RECOGNISED: {
+            LISTEN_COMPLETE: {
               target: "ChatCompletion",
-              actions: "appendUserMessage"
+            },
+            RECOGNISED: {
+              actions: "appendUserMessage",
             },
           },
         },
@@ -233,13 +232,12 @@ const dmMachine = setup({
             input: ({ context }) => context.messages,
             onDone: {
               target: "Speaking",
-              actions: "appendAssistantMessage"
+              actions: "appendAssistantMessage",
             },
-          }
+          },
         },
       },
     },
-
 
     /*
     Main: {
