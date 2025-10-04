@@ -12,6 +12,7 @@ chmod +x furhat-sdk-desktop-launcher.AppImage
 After that, Furhat Studio opens and we can now click on <mark>Lunch Virtual Furhat</mark>.
 Next, we need to start the remote API by either clicking on <mark>Open web interface</mark> or <mark>Remote API</mark>. This will open a window in the browser where you can see the control panel with settings, gestures, etc.
 
+**Important**: When logging into the <a href=https://furhat.io/login> Furhat Developer Zone</a>, you need to use the password you chose when you created your account, BUT when logging in on the dev-server on your local machine, the default password is <mark><em>**admin**</em></mark>.
 
 ### Furhat & XState starter:
 
