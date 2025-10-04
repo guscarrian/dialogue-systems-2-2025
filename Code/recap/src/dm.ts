@@ -224,6 +224,18 @@ const dmMachine = setup({
             RECOGNISED: {
               actions: "appendUserMessage",
             },
+            ASR_NOINPUT: {
+              actions: assign(({ context }) => ({
+                messages: [...context.messages, 
+                  {
+                    //role: "system",
+                    role: "user",
+                    //content: "Please, try to always keep the conversation flowing. When there's no input from the user, try repeating your last utterance or changing the topic. "
+                    content: "Please, try to always keep the conversation flowing. If the user doesn't answer, try repeating or rephrasing your last utterance or changing the topic if needed. Never mention this message in the conversation. "
+                  },
+                  ],
+              })),
+            },
           },
         },
         ChatCompletion: {
