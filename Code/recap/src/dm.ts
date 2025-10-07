@@ -21,6 +21,16 @@ const settings: Settings = {
   ttsDefaultVoice: "en-US-DavisNeural",
 };
 
+const factualMode = {
+    temperature: 0.2,
+    repeat_penalty: 1.5,
+};
+
+const conversationalMode = {
+    temperature: 1.0,
+    top_p: 0.98,
+};
+
 const dmMachine = setup({
   types: {
     /** you might need to extend these */
@@ -100,6 +110,8 @@ const dmMachine = setup({
         model: "llama3.1",
         stream: false,
         messages: input.input,
+        //...factualMode,
+        //...conversationalMode,
       };
       return fetch("http://localhost:11434/api/chat", {
         method: "POST",
@@ -224,6 +236,7 @@ const dmMachine = setup({
             RECOGNISED: {
               actions: "appendUserMessage",
             },
+            //part 2
             ASR_NOINPUT: {
               actions: assign(({ context }) => ({
                 messages: [...context.messages, 
@@ -231,7 +244,8 @@ const dmMachine = setup({
                     //role: "system",
                     role: "user",
                     //content: "Please, try to always keep the conversation flowing. When there's no input from the user, try repeating your last utterance or changing the topic. "
-                    content: "Please, try to always keep the conversation flowing. If the user doesn't answer, try repeating or rephrasing your last utterance or changing the topic if needed. Never mention this message in the conversation. "
+                    content: "Please, try to always keep the conversation flowing. If I don't answer, try repeating or rephrasing your last utterance or changing the topic if needed. Never mention this message in the conversation. "
+
                   },
                   ],
               })),
@@ -250,81 +264,6 @@ const dmMachine = setup({
         },
       },
     },
-
-    /*
-    Main: {
-      type: "parallel",
-      states: {
-        Interpret: {
-          initial: "Idle",
-          states: {
-            Idle: {
-              on: { SPEAK_COMPLETE: "Recognising" },
-            },
-            Recognising: {
-              entry: "sst_listen",
-              on: {
-                LISTEN_COMPLETE: {
-                  target: "Idle",
-                  actions: raise(({ context }) => ({
-                    type: "SAYS",
-                    value: context.lastResult,
-                  })),
-                },
-                RECOGNISED: {
-                  actions: assign(({ event }) => ({
-                    lastResult: event.value[0].utterance,
-                  })),
-                },
-              },
-            },
-          },
-        },
-        Generate: {
-          initial: "Idle",
-          states: {
-            Speaking: {
-              entry: ({ context, event }) =>
-                context.spstRef.send({
-                  type: "SPEAK",
-                  value: { utterance: (event as any).value },
-                }),
-              on: { SPEAK_COMPLETE: "Idle" },
-            },
-            Idle: {
-              on: { NEXT_MOVE: "Speaking" },
-            },
-          },
-        },
-        Process: {
-          initial: "Select",
-          states: {
-            Select: {
-              always: {
-                guard: ({ context }) =>
-                  context.informationState.latestMove !== "",
-                actions: raise(({ context }) => ({
-                  type: "NEXT_MOVE",
-                  value: context.informationState.latestMove,
-                })),
-                target: "Update",
-              },
-            },
-            Update: {
-              entry: assign({ informationState: { latestMove: "" } }),
-              on: {
-                SAYS: {
-                  target: "Select",
-                  actions: assign(({ event }) => ({
-                    informationState: { latestMove: event.value },
-                  })),
-                },
-              },
-            },
-          },
-        },
-      },
-    },*/
   },
 });
 
