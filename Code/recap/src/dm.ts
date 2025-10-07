@@ -40,13 +40,6 @@ const dmMachine = setup({
   actions: {
     sst_prepare: ({ context }) => context.spstRef.send({ type: "PREPARE" }),
     sst_listen: ({ context }) => context.spstRef.send({ type: "LISTEN" }),
-    //sst_speak: ({context}, params: { value: string }) => 
-    //  context.spstRef.send({ type: "SPEAK", value: {utterance: params.value } }),
-    // Note to self: I made the action definition tolerate string | undefined
-    // (value: string is now value?: string) because of the mismatch:
-    // typescript sees context.greeting as string | undefined (not just string), and 
-    // in sst_speak it is defined as (params: { value: string })
-    // Also I'm adding a fallback for the sake of saving time in the future!
     sst_speak: ({context}, params: { value?: string }) => 
       context.spstRef.send({ type: "SPEAK", value: {utterance: params.value ?? "Fallback in action" } }), //fallback
     
